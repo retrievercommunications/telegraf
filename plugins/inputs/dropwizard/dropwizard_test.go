@@ -3,6 +3,7 @@ package dropwizard_test
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/influxdata/telegraf/plugins/inputs/dropwizard"
@@ -12,7 +13,7 @@ import (
 
 func TestDecodeGaugeIntValueJSON(t *testing.T) {
 	plugin := &dropwizard.Dropwizard{}
-	metrics, err := plugin.DecodeJSONMetrics([]byte(gaugeWithIntValueJSON))
+	metrics, err := plugin.DecodeJSONMetrics(strings.NewReader(gaugeWithIntValueJSON))
 	if err != nil {
 		t.Fatalf("error parsing json %v", err)
 	}
@@ -33,7 +34,7 @@ func TestDecodeGaugeIntValueJSON(t *testing.T) {
 
 func TestDecodeGaugeFloatValueJSON(t *testing.T) {
 	plugin := &dropwizard.Dropwizard{}
-	metrics, err := plugin.DecodeJSONMetrics([]byte(gaugeWithFloatValueJSON))
+	metrics, err := plugin.DecodeJSONMetrics(strings.NewReader(gaugeWithFloatValueJSON))
 	if err != nil {
 		t.Fatalf("error parsing json %v", err)
 	}
@@ -54,7 +55,7 @@ func TestDecodeGaugeFloatValueJSON(t *testing.T) {
 
 func TestDecodeGaugeStringValueJSON(t *testing.T) {
 	plugin := &dropwizard.Dropwizard{}
-	metrics, err := plugin.DecodeJSONMetrics([]byte(gaugeWithStringValueJSON))
+	metrics, err := plugin.DecodeJSONMetrics(strings.NewReader(gaugeWithStringValueJSON))
 	if err != nil {
 		t.Fatalf("error parsing json %v", err)
 	}
@@ -75,7 +76,7 @@ func TestDecodeGaugeStringValueJSON(t *testing.T) {
 
 func TestDecodeFloatsInTimersJSON(t *testing.T) {
 	plugin := &dropwizard.Dropwizard{}
-	metrics, err := plugin.DecodeJSONMetrics([]byte(oneMetricPerTypeJSON))
+	metrics, err := plugin.DecodeJSONMetrics(strings.NewReader(oneMetricPerTypeJSON))
 	if err != nil {
 		t.Fatalf("error parsing json %v", err)
 	}

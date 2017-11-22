@@ -3,7 +3,7 @@ package dropwizard
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -235,12 +235,7 @@ func (d *Dropwizard) gatherURL(
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-
-	metrics, err := d.DecodeJSONMetrics(bodyBytes)
+	metrics, err := d.DecodeJSONMetrics(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -340,9 +335,9 @@ func init() {
 	})
 }
 
-func (*Dropwizard) DecodeJSONMetrics(jsonInput []byte) (metrics, error) {
+func (*Dropwizard) DecodeJSONMetrics(r io.Reader) (metrics, error) {
 	var decodedMetrics metrics
-	err := json.Unmarshal(jsonInput, &decodedMetrics)
+	err := json.NewDecoder(r).Decode(&decodedMetrics)
 	if err != nil {
 		return decodedMetrics, err
 	}
