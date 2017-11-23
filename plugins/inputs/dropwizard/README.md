@@ -128,5 +128,3 @@ It would be nice to have some additional features like the following:
 - Per-metric tags, these could be derived using a naming convention like "measurement.name,tag1=value1,tag2=value2"
 
 - Metric name to Measurement name mapping (i.e. renaming). For example, could support mapping "jvm.memory.total" metrics to "jvm_memory" through configuration
-
-- Skipping idle metrics
