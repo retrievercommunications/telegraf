@@ -45,6 +45,11 @@ generate it using `telegraf --usage dropwizard`.
   ## defaults to "%.2f" if not set
   #float_field_format = "%.2f"
 
+  ## skip any metric whose "count" field hasn't changed since last time the metric was pulled
+  ## this applies to metric types: Counter, Histogram, Meter & Timer
+  ## defaults to false if not set
+  skip_idle_metrics = true
+
   ## exclude some built-in metrics
   # namedrop = [
   #  "jvm.classloader*",
