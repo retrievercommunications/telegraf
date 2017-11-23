@@ -164,6 +164,18 @@ func TestBasic(t *testing.T) {
 	acc.AssertContainsFields(t, "org.eclipse.jetty.server.HttpConnectionFactory.8081.connections", fields)
 }
 
+func TestFloatFormatting(t *testing.T) {
+	plugin := &dropwizard.Dropwizard{
+		FloatFieldFormat: "%.2f",
+	}
+	f := plugin.FormatFloat(82.058711464)
+
+	// it will round up
+	if f != 82.06 {
+		t.Errorf("Formatted float was incorrect, got: %.9f, want: 82.06.", f)
+	}
+}	
+
 const oneMetricPerTypeJSON = `
 {
 	"version" : "3.1.3",

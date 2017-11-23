@@ -28,6 +28,9 @@ type Dropwizard struct {
 
 	Timeout internal.Duration
 
+	// should we pass in the format or just the number of decimal places?
+	FloatFieldFormat string `toml:"float_field_format"`
+
 	client *http.Client
 }
 
@@ -53,7 +56,13 @@ func (*Dropwizard) SampleConfig() string {
   # insecure_skip_verify = false
 
   ## http request & header timeout
+  ## defaults to 5s if not set
   timeout = "10s"
+
+  ## format the floating number fields on all metrics to round them off
+  ## this avoids getting very small numbers like 5.647645996854652E-23
+  ## defaults to "%.2f" if not set
+  #float_field_format = "%.2f"
 
   ## exclude some built-in metrics
   # namedrop = [
@@ -244,8 +253,6 @@ func (d *Dropwizard) gatherURL(
 	// through built-in functionality
 	var tags map[string]string = nil
 
-	//TODO do we need to call SetPricision and is this related to units?
-	
 	for name, g := range metrics.Gauges {
 		if g.Value.Type == IntType {
 			acc.AddGauge(name,
@@ -254,7 +261,7 @@ func (d *Dropwizard) gatherURL(
 				now)
 		} else if g.Value.Type == FloatType {
 			acc.AddGauge(name,
-				map[string]interface{}{ "value": g.Value.FloatValue },
+				map[string]interface{}{ "value": d.FormatFloat(g.Value.FloatValue) },
 				tags,
 				now)
 		}
@@ -272,14 +279,14 @@ func (d *Dropwizard) gatherURL(
 			map[string]interface{}{ 
 				"count": h.Count,
 				"max": h.Max,
-				"mean": h.Mean,
+				"mean": d.FormatFloat(h.Mean),
 				"min": h.Min,
-				"p50": h.P50,
-				"p75": h.P75,
-				"p95": h.P95,
-				"p98": h.P98,
-				"p99": h.P99,
-				"p999": h.P999,
+				"p50": d.FormatFloat(h.P50),
+				"p75": d.FormatFloat(h.P75),
+				"p95": d.FormatFloat(h.P95),
+				"p98": d.FormatFloat(h.P98),
+				"p99": d.FormatFloat(h.P99),
+				"p999": d.FormatFloat(h.P999),
 				"stddev": h.Stddev,
 			},
 			tags,
@@ -291,10 +298,10 @@ func (d *Dropwizard) gatherURL(
 		acc.AddHistogram(name,
 			map[string]interface{}{ 
 				"count": m.Count,
-				"m15_rate": m.M15Rate,
-				"m1_rate": m.M1Rate,
-				"m5_rate": m.M5Rate,
-				"mean_rate": m.MeanRate,
+				"m15_rate": d.FormatFloat(m.M15Rate),
+				"m1_rate": d.FormatFloat(m.M1Rate),
+				"m5_rate": d.FormatFloat(m.M5Rate),
+				"mean_rate": d.FormatFloat(m.MeanRate),
 			},
 			tags,
 			now)
@@ -305,20 +312,20 @@ func (d *Dropwizard) gatherURL(
 		acc.AddFields(name,
 			map[string]interface{}{ 
 				"count": t.Count,
-				"max": t.Max,
-				"mean": t.Mean,
-				"min": t.Min,
-				"p50": t.P50,
-				"p75": t.P75,
-				"p95": t.P95,
-				"p98": t.P98,
-				"p99": t.P99,
-				"p999": t.P999,
-				"stddev": t.Stddev,
-				"m15_rate": t.M15Rate,
-				"m1_rate": t.M1Rate,
-				"m5_rate": t.M5Rate,
-				"mean_rate": t.MeanRate,
+				"max": d.FormatFloat(t.Max),
+				"mean": d.FormatFloat(t.Mean),
+				"min": d.FormatFloat(t.Min),
+				"p50": d.FormatFloat(t.P50),
+				"p75": d.FormatFloat(t.P75),
+				"p95": d.FormatFloat(t.P95),
+				"p98": d.FormatFloat(t.P98),
+				"p99": d.FormatFloat(t.P99),
+				"p999": d.FormatFloat(t.P999),
+				"stddev": d.FormatFloat(t.Stddev),
+				"m15_rate": d.FormatFloat(t.M15Rate),
+				"m1_rate": d.FormatFloat(t.M1Rate),
+				"m5_rate": d.FormatFloat(t.M5Rate),
+				"mean_rate": d.FormatFloat(t.MeanRate),
 			},
 			tags,
 			now)
@@ -331,6 +338,7 @@ func init() {
 	inputs.Add("dropwizard", func() telegraf.Input {
 		return &Dropwizard{
 			Timeout: internal.Duration{Duration: time.Second * 5},
+			FloatFieldFormat: "%.2f",
 		}
 	})
 }
@@ -342,4 +350,14 @@ func (*Dropwizard) DecodeJSONMetrics(r io.Reader) (metrics, error) {
 		return decodedMetrics, err
 	}
 	return decodedMetrics, nil
+}
+
+func (d *Dropwizard) FormatFloat(f float64) float64 {
+	if d.FloatFieldFormat != "" {
+		floatValue, err := strconv.ParseFloat(fmt.Sprintf(d.FloatFieldFormat, f), 64)
+		if err == nil {
+			return floatValue
+		}
+	}
+	return f
 }
