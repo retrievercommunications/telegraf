@@ -164,6 +164,34 @@ func TestBasic(t *testing.T) {
 	acc.AssertContainsFields(t, "org.eclipse.jetty.server.HttpConnectionFactory.8081.connections", fields)
 }
 
+func TestSkippingIdleMetrics(t *testing.T) {
+	fakeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/endpoint" {
+			_, _ = w.Write([]byte(oneMetricPerTypeJSON))
+		} else {
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer fakeServer.Close()
+
+	plugin := &dropwizard.Dropwizard{
+		URLs: []string{fakeServer.URL + "/endpoint"},
+		SkipIdleMetrics: true,
+	}
+
+	var acc testutil.Accumulator
+	require.NoError(t, acc.GatherError(plugin.Gather))
+
+	require.Len(t, acc.Metrics, 5)
+
+	acc.ClearMetrics()
+
+	require.NoError(t, acc.GatherError(plugin.Gather))
+
+	// only the gauge should come through
+	require.Len(t, acc.Metrics, 1)
+}
+
 func TestFloatFormatting(t *testing.T) {
 	plugin := &dropwizard.Dropwizard{
 		FloatFieldFormat: "%.2f",
