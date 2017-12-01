@@ -45,6 +45,11 @@ generate it using `telegraf --usage dropwizard`.
   ## defaults to "%.2f" if not set
   #float_field_format = "%.2f"
 
+  ## skip any metric whose "count" field hasn't changed since last time the metric was pulled
+  ## this applies to metric types: Counter, Histogram, Meter & Timer
+  ## defaults to false if not set
+  skip_idle_metrics = true
+
   ## exclude some built-in metrics
   # namedrop = [
   #  "jvm.classloader*",
@@ -123,5 +128,3 @@ It would be nice to have some additional features like the following:
 - Per-metric tags, these could be derived using a naming convention like "measurement.name,tag1=value1,tag2=value2"
 
 - Metric name to Measurement name mapping (i.e. renaming). For example, could support mapping "jvm.memory.total" metrics to "jvm_memory" through configuration
-
-- Skipping idle metrics

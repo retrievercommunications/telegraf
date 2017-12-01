@@ -31,6 +31,11 @@ type Dropwizard struct {
 	// should we pass in the format or just the number of decimal places?
 	FloatFieldFormat string `toml:"float_field_format"`
 
+	// can skip any idle metric that has a count field
+	SkipIdleMetrics bool `toml:"skip_idle_metrics"`
+	// we don't want to store the whole metric, just the metric name and count field
+	previousCountValues map[string]int64
+
 	client *http.Client
 }
 
@@ -63,6 +68,11 @@ func (*Dropwizard) SampleConfig() string {
   ## this avoids getting very small numbers like 5.647645996854652E-23
   ## defaults to "%.2f" if not set
   #float_field_format = "%.2f"
+
+  ## skip any metric whose "count" field hasn't changed since last time the metric was pulled
+  ## this applies to metric types: Counter, Histogram, Meter & Timer
+  ## defaults to false if not set
+  skip_idle_metrics = true
 
   ## exclude some built-in metrics
   # namedrop = [
@@ -143,20 +153,20 @@ type gaugeValue struct {
 	Type gaugeValueType
 }
 
-func (v *gaugeValue) UnmarshalJSON(b []byte) error {
+func (gv *gaugeValue) UnmarshalJSON(b []byte) error {
 	jsonString := string(b)
 	if intValue, err := strconv.ParseInt(jsonString, 10, 64); err == nil {
-		*v = gaugeValue{ 
+		*gv = gaugeValue{ 
 			IntValue: intValue,
 			Type: IntType,
 		}
 	} else if floatValue, err := strconv.ParseFloat(jsonString, 64); err == nil {
-		*v = gaugeValue{ 
+		*gv = gaugeValue{ 
 			FloatValue: floatValue,
 			Type: FloatType,
 		}
 	} else {
-		*v = gaugeValue{ 
+		*gv = gaugeValue{ 
 			StringValue: strings.Trim(jsonString, "\""),
 			Type: StringType,
 		}
@@ -173,8 +183,18 @@ type counter struct {
 	Count int64 `json:"count"`
 }
 
+func (c *counter) UnmarshalJSON(b []byte) error {
+	jsonString := string(b)
+	if intValue, err := strconv.ParseInt(jsonString, 10, 64); err == nil {
+		*c = counter{ 
+			Count: intValue,
+		}
+	} 
+	return nil
+}
+
 type histogram struct {
-	Count  int64   `json:"count"`
+	Counter counter `json:"count"`
 	Max    int64   `json:"max"`
 	Mean   float64 `json:"mean"`
 	Min    int64   `json:"min"`
@@ -188,7 +208,7 @@ type histogram struct {
 }
 
 type meter struct {
-	Count    int64   `json:"count"`
+	Counter counter  `json:"count"`
 	M15Rate  float64 `json:"m15_rate"`
 	M1Rate   float64 `json:"m1_rate"`
 	M5Rate   float64 `json:"m5_rate"`
@@ -197,7 +217,7 @@ type meter struct {
 }
 
 type timer struct {
-	Count         int64   `json:"count"`
+	Counter	      counter `json:"count"`
 	Max           float64 `json:"max"`
 	Mean          float64 `json:"mean"`
 	Min           float64 `json:"min"`
@@ -253,6 +273,10 @@ func (d *Dropwizard) gatherURL(
 	// through built-in functionality
 	var tags map[string]string = nil
 
+	if d.SkipIdleMetrics && d.previousCountValues == nil {
+		d.previousCountValues = make(map[string]int64)
+	}
+
 	for name, g := range metrics.Gauges {
 		if g.Value.Type == IntType {
 			acc.AddGauge(name,
@@ -268,6 +292,10 @@ func (d *Dropwizard) gatherURL(
 	}
 
 	for name, c := range metrics.Counters {
+		if d.canSkipMetric(name, &c) {
+			continue
+		}
+
 		acc.AddCounter(name,
 			map[string]interface{}{ "count": c.Count },
 			tags,
@@ -275,9 +303,13 @@ func (d *Dropwizard) gatherURL(
 	}
 
 	for name, h := range metrics.Histograms {
+		if d.canSkipMetric(name, &h.Counter) {
+			continue
+		}
+
 		acc.AddHistogram(name,
 			map[string]interface{}{ 
-				"count": h.Count,
+				"count": h.Counter.Count,
 				"max": h.Max,
 				"mean": d.FormatFloat(h.Mean),
 				"min": h.Min,
@@ -295,9 +327,13 @@ func (d *Dropwizard) gatherURL(
 
 	//TODO what to do with the Units?
 	for name, m := range metrics.Meters {
+		if d.canSkipMetric(name, &m.Counter) {
+			continue
+		}
+
 		acc.AddHistogram(name,
 			map[string]interface{}{ 
-				"count": m.Count,
+				"count": m.Counter.Count,
 				"m15_rate": d.FormatFloat(m.M15Rate),
 				"m1_rate": d.FormatFloat(m.M1Rate),
 				"m5_rate": d.FormatFloat(m.M5Rate),
@@ -309,9 +345,13 @@ func (d *Dropwizard) gatherURL(
 
 	//TODO what to do with duration and rate units?
 	for name, t := range metrics.Timers {
+		if d.canSkipMetric(name, &t.Counter) {
+			continue
+		}
+
 		acc.AddFields(name,
 			map[string]interface{}{ 
-				"count": t.Count,
+				"count": t.Counter.Count,
 				"max": d.FormatFloat(t.Max),
 				"mean": d.FormatFloat(t.Mean),
 				"min": d.FormatFloat(t.Min),
@@ -361,4 +401,17 @@ func (d *Dropwizard) FormatFloat(f float64) float64 {
 		return f
 	}
 	return floatValue
+}
+
+func (d *Dropwizard) canSkipMetric(name string, c *counter) bool {
+	if d.SkipIdleMetrics {
+		if val, ok := d.previousCountValues[name]; ok {
+			if val == c.Count {
+				return true
+			}
+		} 
+		d.previousCountValues[name] = c.Count
+	}
+
+	return false
 }
