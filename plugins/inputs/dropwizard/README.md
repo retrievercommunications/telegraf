@@ -9,8 +9,9 @@ The plugin expects that the web application will serve a JSON representation of 
 This plugin is an alternate to using Dropwizard Metrics Reporter implementations like the ones from [iZettle](https://github.com/iZettle/dropwizard-metrics-influxdb) and [kickstarter](https://github.com/kickstarter/dropwizard-influxdb-reporter). The features in this plugin are inspired by the above mentioned Reporter libraries.
 The main differences with this plugin compared to the Reporters are:
 
-- metrics will be pulled from the Dropwizard application rather than it pushing metrics via the Reporters. This reduces the responsibilities of the web application
-- you can change configuration or functionality without restarting the application. This gives Operations greater flexibility to manage the infrastructure without affecting the apps.
+- you can change metrics collection configuration or certain functionality without changing or restarting the Dropwizard application. This gives Operations greater flexibility to manage the infrastructure without affecting the application.
+- metrics will be pulled from the Dropwizard application rather than it pushing metrics via the Reporters. This reduces the responsibilities of the web application.
+
 
 ### Configuration:
 
@@ -36,7 +37,13 @@ generate it using `telegraf --usage dropwizard`.
   # insecure_skip_verify = false
 
   ## http request & header timeout
+  ## defaults to 5s if not set
   timeout = "10s"
+
+  ## format the floating number fields on all metrics to round them off
+  ## this avoids getting very small numbers like 5.647645996854652E-23
+  ## defaults to "%.2f" if not set
+  #float_field_format = "%.2f"
 
   ## exclude some built-in metrics
   # namedrop = [
@@ -88,20 +95,20 @@ SELECT mean("value") AS "mean_value" FROM "telegraf"."autogen"."jvm.memory.total
 
 ```
 ./telegraf --input-filter dropwizard --test
-2017/11/22 07:06:40 I! Using config file: /Users/telegraf/.telegraf/telegraf.conf
+2017/11/24 07:23:32 I! Using config file: /Users/dropwizard/.telegraf/telegraf.conf
 * Plugin: inputs.dropwizard, Collection 1
-> jvm.memory.total.used,host=myhost value=93176816i 1511294800000000000
-> jvm.memory.total.max,host=myhost value=1908932607i 1511294800000000000
-> jvm.memory.total.committed,host=myhost value=177602560i 1511294800000000000
-> jvm.memory.total.init,host=myhost value=136773632i 1511294800000000000
-> ch.qos.logback.core.Appender.all,host=myhost count=16i 1511294800000000000
-> ch.qos.logback.core.Appender.debug,host=myhost count=0i 1511294800000000000
-> ch.qos.logback.core.Appender.error,host=myhost count=0i 1511294800000000000
-> ch.qos.logback.core.Appender.trace,host=myhost count=0i 1511294800000000000
-> ch.qos.logback.core.Appender.info,host=myhost count=16i 1511294800000000000
-> ch.qos.logback.core.Appender.warn,host=myhost count=0i 1511294800000000000
-> org.eclipse.jetty.server.HttpConnectionFactory.8081.connections,host=myhost max=48.568033221,count=3i,p999=5.019724599 1511294800000000000
-> org.eclipse.jetty.server.HttpConnectionFactory.8080.connections,host=myhost max=0,p999=0,count=0i 1511294800000000000
+> jvm.memory.total.max,host=dropwizard value=1908932607i 1511468612000000000
+> jvm.memory.total.used,host=dropwizard value=62960264i 1511468612000000000
+> jvm.memory.total.committed,host=dropwizard value=179109888i 1511468612000000000
+> jvm.memory.total.init,host=dropwizard value=136773632i 1511468612000000000
+> ch.qos.logback.core.Appender.all,host=dropwizard count=16i,m5_rate=0 1511468612000000000
+> ch.qos.logback.core.Appender.debug,host=dropwizard count=0i,m5_rate=0 1511468612000000000
+> ch.qos.logback.core.Appender.error,host=dropwizard count=0i,m5_rate=0 1511468612000000000
+> ch.qos.logback.core.Appender.info,host=dropwizard count=16i,m5_rate=0 1511468612000000000
+> ch.qos.logback.core.Appender.trace,host=dropwizard count=0i,m5_rate=0 1511468612000000000
+> ch.qos.logback.core.Appender.warn,host=dropwizard m5_rate=0,count=0i 1511468612000000000
+> org.eclipse.jetty.server.HttpConnectionFactory.9000.connections,host=dropwizard p999=40.16,count=1i,max=40.16,m5_rate=0 1511468612000000000
+> org.eclipse.jetty.server.HttpConnectionFactory.9001.connections,host=dropwizard count=6i,m5_rate=0,p999=50.01,max=235.67 1511468612000000000
 ```
 
 ### TODO:
@@ -116,3 +123,5 @@ It would be nice to have some additional features like the following:
 - Per-metric tags, these could be derived using a naming convention like "measurement.name,tag1=value1,tag2=value2"
 
 - Metric name to Measurement name mapping (i.e. renaming). For example, could support mapping "jvm.memory.total" metrics to "jvm_memory" through configuration
+
+- Skipping idle metrics
