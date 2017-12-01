@@ -393,13 +393,14 @@ func (*Dropwizard) DecodeJSONMetrics(r io.Reader) (metrics, error) {
 }
 
 func (d *Dropwizard) FormatFloat(f float64) float64 {
-	if d.FloatFieldFormat != "" {
-		floatValue, err := strconv.ParseFloat(fmt.Sprintf(d.FloatFieldFormat, f), 64)
-		if err == nil {
-			return floatValue
-		}
+	if d.FloatFieldFormat == "" {
+		return f
 	}
-	return f
+	floatValue, err := strconv.ParseFloat(fmt.Sprintf(d.FloatFieldFormat, f), 64)
+	if err != nil {
+		return f
+	}
+	return floatValue
 }
 
 func (d *Dropwizard) canSkipMetric(name string, c *counter) bool {
